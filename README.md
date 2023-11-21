@@ -7,3 +7,11 @@ tambem foi utilizado o pandas para criar um df da base de tados e filtrar todas 
 
 O projeto exigiu bastante de analises por conta do nivel sensivel de informação  dos investidores do banco BTGPACTUAL e tambem diferenças nas colunas das tabelas.
 
+
+# Dentro da pasta modelo estão os arquivos antes da extração dos dados 
+
+Lá estão os arquivos PDF que foram analisados usando o tabula e o resultado da conversão em planilhas 
+
+# Relatórios 
+
+Dentro da pasta relatórios tem a exibição final de todas as  informações de transferencias de CALL & PUT do cliente; 
