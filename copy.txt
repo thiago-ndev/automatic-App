@@ -1,0 +1,46 @@
+import boto3
+
+# Conexão com DynamoDB
+dynamodb = boto3.resource('dynamodb', region_name='us-east-1')
+table = dynamodb.Table('DELOREAN')
+
+def atualizar_modelo(model_key: str, novo_current_dt_t0: str, novo_current_version: str):
+    """Atualiza um modelo na tabela DELOREAN mantendo backup e previous."""
+    
+    # Consultar item atual
+    item = table.get_item(Key={'MODEL': model_key}).get('Item')
+    if not item:
+        print(f"Modelo {model_key} não encontrado.")
+        return
+    
+    # Construir atributos
+    atributos = {
+        # Backup (bk) e Previous recebem os valores atuais
+        'bk_dt_t0': item.get('current_dt_t0', ''),
+        'bk_version': item.get('current_version', ''),
+        'previous_dt_t0': item.get('current_dt_t0', ''),
+        'previous_version': item.get('current_version', ''),
+
+        # Current recebe novos valores
+        'current_dt_t0': novo_current_dt_t0,
+        'current_version': novo_current_version
+    }
+
+    # Update no DynamoDB
+    response = table.update_item(
+        Key={'MODEL': model_key},
+        UpdateExpression="SET " + ", ".join(f"{k} = :{k}" for k in atributos),
+        ExpressionAttributeValues={f":{k}": v for k, v in atributos.items()},
+        ReturnValues="UPDATED_NEW"
+    )
+
+    print(f"Modelo {model_key} atualizado com sucesso.")
+    print(response['Attributes'])
+
+
+# 🔹 Exemplo de uso
+atualizar_modelo(
+    model_key='DMC-12',
+    novo_current_dt_t0='2025-07-30',
+    novo_current_version='2.2'
+)
