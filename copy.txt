@@ -1,46 +1,62 @@
+from airflow import DAG
+from airflow.operators.python import PythonOperator
+from datetime import datetime
 import boto3
 
-# Conexão com DynamoDB
-dynamodb = boto3.resource('dynamodb', region_name='us-east-1')
-table = dynamodb.Table('DELOREAN')
+# ---- Função para atualizar tabela DELOREAN ----
+def atualizar_delorean(model_key, novo_current_dt_t0, novo_current_version, **kwargs):
+    dynamodb = boto3.resource('dynamodb', region_name='us-east-1')
+    table = dynamodb.Table('DELOREAN')
 
-def atualizar_modelo(model_key: str, novo_current_dt_t0: str, novo_current_version: str):
-    """Atualiza um modelo na tabela DELOREAN mantendo backup e previous."""
-    
     # Consultar item atual
     item = table.get_item(Key={'MODEL': model_key}).get('Item')
     if not item:
-        print(f"Modelo {model_key} não encontrado.")
-        return
-    
-    # Construir atributos
-    atributos = {
-        # Backup (bk) e Previous recebem os valores atuais
-        'bk_dt_t0': item.get('current_dt_t0', ''),
-        'bk_version': item.get('current_version', ''),
-        'previous_dt_t0': item.get('current_dt_t0', ''),
-        'previous_version': item.get('current_version', ''),
+        raise ValueError(f"Modelo {model_key} não encontrado.")
 
-        # Current recebe novos valores
-        'current_dt_t0': novo_current_dt_t0,
-        'current_version': novo_current_version
+    # Preparar valores
+    update_expression = """
+        SET bk_dt_t0 = :bk_dt_t0,
+            bk_version = :bk_version,
+            previous_dt_t0 = :previous_dt_t0,
+            previous_version = :previous_version,
+            current_dt_t0 = :current_dt_t0,
+            current_version = :current_version
+    """
+    expression_values = {
+        ':bk_dt_t0': item.get('current_dt_t0', ''),
+        ':bk_version': item.get('current_version', ''),
+        ':previous_dt_t0': item.get('current_dt_t0', ''),
+        ':previous_version': item.get('current_version', ''),
+        ':current_dt_t0': novo_current_dt_t0,
+        ':current_version': novo_current_version
     }
 
-    # Update no DynamoDB
+    # Atualizar
     response = table.update_item(
         Key={'MODEL': model_key},
-        UpdateExpression="SET " + ", ".join(f"{k} = :{k}" for k in atributos),
-        ExpressionAttributeValues={f":{k}": v for k, v in atributos.items()},
+        UpdateExpression=update_expression,
+        ExpressionAttributeValues=expression_values,
         ReturnValues="UPDATED_NEW"
     )
-
-    print(f"Modelo {model_key} atualizado com sucesso.")
-    print(response['Attributes'])
+    print(f"Modelo {model_key} atualizado:", response['Attributes'])
 
 
-# 🔹 Exemplo de uso
-atualizar_modelo(
-    model_key='DMC-12',
-    novo_current_dt_t0='2025-07-30',
-    novo_current_version='2.2'
-)
+# ---- Definição da DAG ----
+with DAG(
+    dag_id='atualizar_delorean_dynamodb',
+    start_date=datetime(2025, 7, 29),
+    schedule_interval=None,  # Executa sob demanda
+    catchup=False
+) as dag:
+
+    atualizar_task = PythonOperator(
+        task_id='atualizar_tabela_delorean',
+        python_callable=atualizar_delorean,
+        op_kwargs={
+            'model_key': 'DMC-12',
+            'novo_current_dt_t0': '2025-07-30',
+            'novo_current_version': '2.2'
+        }
+    )
+
+    atualizar_task
